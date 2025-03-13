@@ -1,0 +1,185 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+#include <unistd.h>
+
+// Structure to hold account details
+typedef struct Account {
+    int age;
+    char sname[100];
+    char mname[100];
+    struct Account* next; // Pointer to the next account (for Linked List)
+} Account;
+
+// Structure for OTP Map (using a simple array-based HashMap)
+typedef struct OTPMap {
+    char phone[20];
+    int otp;
+    struct OTPMap* next; // For collision handling (in case of same phone numbers)
+} OTPMap;
+
+// Head pointers for Linked Lists
+Account* head = NULL;
+OTPMap* otpHead = NULL;
+
+// Function to remove the newline character from a string if present
+void removeNewline(char *str) {
+    str[strcspn(str, "\n")] = '\0';
+}
+
+// Function to insert account details into the linked list
+void insertAccount(int age, const char* sname, const char* mname) {
+    Account* newAccount = (Account*) malloc(sizeof(Account));
+    newAccount->age = age;
+    strcpy(newAccount->sname, sname);
+    strcpy(newAccount->mname, mname);
+    newAccount->next = head;
+    head = newAccount;
+}
+
+// Function to search for OTP using phone number (simple hash-based lookup)
+OTPMap* searchOTP(char* phone) {
+    OTPMap* temp = otpHead;
+    while (temp != NULL) {
+        if (strcmp(temp->phone, phone) == 0)
+            return temp; // Return OTP Map node if found
+        temp = temp->next;
+    }
+    return NULL; // If not found
+}
+
+// Function to insert OTP into the hash map
+void insertOTP(char* phone, int otp) {
+    OTPMap* newOtpMap = (OTPMap*) malloc(sizeof(OTPMap));
+    strcpy(newOtpMap->phone, phone);
+    newOtpMap->otp = otp;
+    newOtpMap->next = otpHead;
+    otpHead = newOtpMap;
+}
+
+// Function to ask user if they want to open an account and get the requirement (savings/current)
+char* newacc(void) {
+    static char requirement[100];
+    char input[20];
+    while (1) {
+        printf("Are you interested to open an account (Yes/No): ");
+        if (fgets(input, sizeof(input), stdin) == NULL)
+            continue;
+        removeNewline(input);
+        if (strcasecmp(input, "yes") == 0) {
+            printf("\nYou want to open a savings or current account \n");
+            printf("\nEnter Your requirement here: ");
+            if (fgets(requirement, sizeof(requirement), stdin) == NULL)
+                continue;
+            removeNewline(requirement);
+            return requirement;
+        } else {
+            printf("Please Enter a valid input\n");
+        }
+    }
+}
+
+// Function to ask for user details and check eligibility based on age
+Account* details(void) {
+    Account* ad = (Account*) malloc(sizeof(Account));
+    // Get surname
+    printf("Enter Your surname : ");
+    if(fgets(ad->sname, sizeof(ad->sname), stdin))
+        removeNewline(ad->sname);
+    // Get middle name
+    printf("Enter Your Middle name: ");
+    if(fgets(ad->mname, sizeof(ad->mname), stdin))
+        removeNewline(ad->mname);
+    
+    // Age verification
+    while (1) {
+        int born = 0;
+        printf("Enter your Year of birth: ");
+        if (scanf("%d", &born) != 1) {
+            while(getchar() != '\n');
+            continue;
+        }
+        while(getchar() != '\n'); // Clear newline
+        // Get current year
+        time_t t = time(NULL);
+        struct tm *tm_info = localtime(&t);
+        int current_year = tm_info->tm_year + 1900;
+        ad->age = current_year - born;
+        if (ad->age < 18) {
+            printf("\nSorry, you are not eligible to open an account.\n");
+            return NULL; // Ineligible, return NULL
+        } else {
+            printf("\nYou are eligible to open an account...\n");
+            return ad;
+        }
+    }
+}
+
+// Function to generate a random OTP between 1000 and 10000 (inclusive)
+int generateOTP(void) {
+    int g = (rand() % 9001) + 1000;
+    return g;
+}
+
+// Function to handle deposit and withdrawal operations
+void deposit(Account* ad) {
+    int add;
+    printf("How much amount you want to deposit: ");
+    scanf("%d", &add);
+    int amount = 1000 + add; // Adding the deposit to the initial balance
+    printf("Amount processing!....\n");
+    printf("The available amount is: %d\n", amount);
+    printf("Transaction complete. Thank you!\n");
+}
+
+// Function to perform OTP-based balance checking and deposit handling
+void balance(Account* ad, char* phone) {
+    int g = generateOTP(); // Generate OTP
+    insertOTP(phone, g);   // Store OTP in hash map
+    printf("OTP is successfully sent to the phone number: %s\n", phone);
+
+    while (1) {
+        int Otp;
+        printf("Enter the OTP: ");
+        if (scanf("%d", &Otp) != 1) {
+            while(getchar() != '\n');
+            continue;
+        }
+
+        OTPMap* otpEntry = searchOTP(phone); // Search OTP for the phone
+        if (otpEntry != NULL && otpEntry->otp == Otp) {
+            printf("Your current balance is 1000 (Initial Balance)\n");
+            deposit(ad);
+            break;
+        } else {
+            printf("Invalid OTP! Please try again.\n");
+        }
+    }
+}
+
+int main(void) {
+    srand(time(NULL)); // Seed the random number generator
+    printf(".......Welcome to Union Bank of India!.......\n");
+
+    Account* ad = details();
+    if (ad != NULL && ad->age >= 18) {
+        // Insert account details to the linked list
+        insertAccount(ad->age, ad->sname, ad->mname);
+        free(ad); // Free memory as it's no longer needed
+
+        char* accountType = newacc();  // Ask for account type (savings or current)
+        printf("Account type selected: %s\n", accountType);
+
+        char phone[20];
+        printf("Please enter your phone number (+91): ");
+        fgets(phone, sizeof(phone), stdin);
+        removeNewline(phone);
+        
+        balance(ad, phone);  // Call balance and OTP functions
+    } else {
+        printf("Sorry, you're not eligible for a new account.\n");
+    }
+    return 0;
+}
